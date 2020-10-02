@@ -1,0 +1,8 @@
+<launch>
+  <arg name="address" default="192.168.0.100" />
+  <arg name="port" default="80" />
+  <node 
+    pkg="onvif_camera" exec="onvif_camera" output="screen" 
+    args="-p $(var port) -u $(var user) -a $(var password) $(var address)"
+  />
+</launch>

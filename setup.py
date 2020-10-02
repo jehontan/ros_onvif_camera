@@ -2,12 +2,12 @@
 from glob import glob
 from setuptools import setup
 
-package_name = 'ros_onvif_camera'
+package_name = 'onvif_camera'
 
 setup(
     name=package_name,
     version='0.1.0',
-    packages=[package_name, 'sort'],
+    packages=[package_name],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -32,7 +32,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'onviv_camera = ros_onvif_camera.ros_onvif_camera:main'
+            'onvif_camera = onvif_camera.onvif_camera:main'
         ],
     },
 )

@@ -21,16 +21,16 @@ def quaternion_to_euler(x, y, z, w):
   import math
   t0 = +2.0 * (w * x + y * z)
   t1 = +1.0 - 2.0 * (x * x + y * y)
-  X = np.atan2(t0, t1)
+  X = np.arctan2(t0, t1)
 
   t2 = +2.0 * (w * y - z * x)
   t2 = +1.0 if t2 > +1.0 else t2
   t2 = -1.0 if t2 < -1.0 else t2
-  Y = np.asin(t2)
+  Y = np.arcsin(t2)
 
   t3 = +2.0 * (w * z + x * y)
   t4 = +1.0 - 2.0 * (y * y + z * z)
-  Z = np.atan2(t3, t4)
+  Z = np.arctan2(t3, t4)
 
   return X, Y, Z
 
@@ -41,13 +41,13 @@ class CameraNode(Node):
     self.name = name
     self.offset = offset
 
-    # setup transform broadcaster
-    self.transform_broadcaster = tf2_ros.TransformBroadcaster(self)
-
     # setup PTZ
+    self.get_logger().info('Connecting to camera %s:%d'%(params['address'], params['port']))
     self._camera = ONVIFCamera(params['address'], params['port'], params['user'], params['password'])
+    self.get_logger().info('Configuring services')
     self._media = self._camera.create_media_service()
     self._ptz = self._camera.create_ptz_service()
+    self.get_logger().info('Configured')
 
     media_profile = self._media.GetProfiles()[0]
     self._profile_token = media_profile.token
@@ -90,9 +90,17 @@ class CameraNode(Node):
     self.set_parameters([XMAX, XMIN, YMAX, YMIN])
 
     # initialize self.pos
-    self.update_pose()
+    pos = self._ptz.GetStatus({'ProfileToken': self._profile_token}).Position
+    pt = self.normal_to_radian(pos.PanTilt)
 
-    
+    self.pos = {
+      'pan': pt['x'],
+      'tilt': pt['y'],
+      'zoom': pos.Zoom.x
+    }
+
+    # setup transform broadcaster
+    self._tf_br = tf2_ros.TransformBroadcaster(self)
     self._timer = self.create_timer(0.5, self.update_pose) # update every 0.5 sec
 
     # create control subscriber
@@ -128,7 +136,7 @@ class CameraNode(Node):
     t.transform.rotation.z = q[2]
     t.transform.rotation.w = q[3]
 
-    self.transform_broadcaster.sendTransform(t)
+    self._tf_br.sendTransform(t)
   
 
   def handle_cmd_abs_move(self, msg:PoseStamped):
@@ -150,10 +158,12 @@ class CameraNode(Node):
       zoom - Zoom position from 0.0 to 1.0
     """
 
+    self.get_logger().info('%f, %f'%(pan, tilt))
+
     self._ptz.AbsoluteMove({
       'ProfileToken': self._profile_token,
       'Position': {
-        'PanTilt': radian_to_normal({
+        'PanTilt': self.radian_to_normal({
           'x': pan if pan is not None else self.pos['pan'],
           'y': tilt if tilt is not None else self.pos['tilt'],
         }),
@@ -170,8 +180,8 @@ class CameraNode(Node):
     Converts from camera normalized form to radians.
     """
     return {
-      'x': (vec['x']+1.0)*180+self.offset['pan'],
-      'y': -(vec['y']-1.0)*45+self.offset['tilt']
+      'x': (vec['x']+1.0)*(np.pi)+self.offset['pan'],
+      'y': -(vec['y']-1.0)*(np.pi/4)+self.offset['tilt']
     }
 
   def radian_to_normal(self, vec):
@@ -179,8 +189,8 @@ class CameraNode(Node):
     Converts from radians to camera normalized form.
     """
     return {
-      'x': 2*((vec['x']-self.offset['pan'])%360)/360 - 1.0,
-      'y':-2*((vec['y']-self.offset['tilt'])%90)/90 + 1.0
+      'x': 2*((vec['x']-self.offset['pan'])%(2*np.pi))/(2*np.pi) - 1.0,
+      'y':-2*((vec['y']-self.offset['tilt'])%(np.pi/2))/(np.pi/2) + 1.0
     }
 
 def main():

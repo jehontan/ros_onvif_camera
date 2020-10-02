@@ -7,7 +7,7 @@ package_name = 'onvif_camera'
 setup(
     name=package_name,
     version='0.1.0',
-    packages=[package_name],
+    packages=[package_name, 'test_control'],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -32,7 +32,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'onvif_camera = onvif_camera.onvif_camera:main'
+            'onvif_camera = onvif_camera.onvif_camera:main',
+            'test_control = test_control.test_control:main'
         ],
     },
 )

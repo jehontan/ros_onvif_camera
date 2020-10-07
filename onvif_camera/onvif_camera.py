@@ -3,39 +3,17 @@ import argparse
 import rclpy
 from rclpy.node import Node
 from onvif import ONVIFCamera
+from onvif.exceptions import *
 
 import numpy as np
 
 import tf2_ros
 from geometry_msgs.msg import TransformStamped, PoseStamped
 
-def euler_to_quaternion(roll, pitch, yaw):
-  qx = np.sin(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) - np.cos(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
-  qy = np.cos(roll/2) * np.sin(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.cos(pitch/2) * np.sin(yaw/2)
-  qz = np.cos(roll/2) * np.cos(pitch/2) * np.sin(yaw/2) - np.sin(roll/2) * np.sin(pitch/2) * np.cos(yaw/2)
-  qw = np.cos(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
-
-  return [qx, qy, qz, qw]
-
-def quaternion_to_euler(x, y, z, w):
-  import math
-  t0 = +2.0 * (w * x + y * z)
-  t1 = +1.0 - 2.0 * (x * x + y * y)
-  X = np.arctan2(t0, t1)
-
-  t2 = +2.0 * (w * y - z * x)
-  t2 = +1.0 if t2 > +1.0 else t2
-  t2 = -1.0 if t2 < -1.0 else t2
-  Y = np.arcsin(t2)
-
-  t3 = +2.0 * (w * z + x * y)
-  t4 = +1.0 - 2.0 * (y * y + z * z)
-  Z = np.arctan2(t3, t4)
-
-  return X, Y, Z
+from geometry_helper.geometry_helper import *
 
 class CameraNode(Node):
-  def __init__(self, name, params, offset={'pan':22, 'tilt':0}):
+  def __init__(self, name, params, offset={'pan':0.3839724354387525, 'tilt':0}):
     super().__init__(name, namespace=name)
 
     self.name = name
@@ -99,6 +77,8 @@ class CameraNode(Node):
       'zoom': pos.Zoom.x
     }
 
+    self.get_logger().info('Initial position: %s'%(repr(self.pos)))
+
     # setup transform broadcaster
     self._tf_br = tf2_ros.TransformBroadcaster(self)
     self._timer = self.create_timer(0.5, self.update_pose) # update every 0.5 sec
@@ -123,8 +103,6 @@ class CameraNode(Node):
       'tilt': pt['y'],
       'zoom': pos.Zoom.x
     }
-
-    self.zoom = pos.Zoom.x
 
     t = TransformStamped()
     t.header.stamp = self.get_clock().now().to_msg()
@@ -158,7 +136,10 @@ class CameraNode(Node):
       zoom - Zoom position from 0.0 to 1.0
     """
 
-    self.get_logger().info('%f, %f'%(pan, tilt))
+    self.get_logger().info('Moving to: %f, %f, %f'%(
+      pan if pan is not None else self.pos['pan'],
+      tilt if tilt is not None else self.pos['tilt'],
+      zoom if zoom is not None else self.pos['zoom']))
 
     self._ptz.AbsoluteMove({
       'ProfileToken': self._profile_token,

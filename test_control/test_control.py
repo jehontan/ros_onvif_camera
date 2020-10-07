@@ -3,17 +3,13 @@ from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 
 import numpy as np
+import socket
+import struct
 
 import time
 import random
 
-def euler_to_quaternion(roll, pitch, yaw):
-  qx = np.sin(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) - np.cos(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
-  qy = np.cos(roll/2) * np.sin(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.cos(pitch/2) * np.sin(yaw/2)
-  qz = np.cos(roll/2) * np.cos(pitch/2) * np.sin(yaw/2) - np.sin(roll/2) * np.sin(pitch/2) * np.cos(yaw/2)
-  qw = np.cos(roll/2) * np.cos(pitch/2) * np.cos(yaw/2) + np.sin(roll/2) * np.sin(pitch/2) * np.sin(yaw/2)
-
-  return [qx, qy, qz, qw]
+from geometry_helper.geometry_helper import *
 
 class TestNode(Node):
   def __init__(self):
@@ -26,25 +22,56 @@ class TestNode(Node):
       10
     )
 
-    self._timer = self.create_timer(5, self.send_command) # update every 0.5 sec
+    self.serve()
 
-  def send_command(self):
+  def send_command(self, pan, tilt, zoom):
+    """
+    Send PTZ command.
+    
+    Params:
+      pan - Pan angle in degrees
+      tilt - Tilt angle in degrees
+      zoom - Zoom  [0.0, 1.0]
+    """
     msg = PoseStamped()
     msg.header.stamp = self.get_clock().now().to_msg() # new timestamp
 
-    pan = random.uniform(0, 2*np.pi)
-    tilt = random.uniform(0, np.pi/2)
+    p = pan/180*np.pi
+    t = tilt/180*np.pi
+    self.get_logger().info('%f, %f, %f'%(pan, tilt, zoom))
 
-    self.get_logger().info('%f, %f'%(pan, tilt))
-
-    q = euler_to_quaternion(0, tilt, pan)
+    q = euler_to_quaternion(0, t, p)
 
     msg.pose.orientation.x = q[0]
     msg.pose.orientation.y = q[1]
     msg.pose.orientation.z = q[2]
     msg.pose.orientation.w = q[3]
 
+    msg.pose.position.z = max(min(zoom, 1.0), 0.0)
+
     self._publisher.publish(msg)
+
+  def serve(self):
+    HOST = '192.168.137.216'
+    PORT = 2306
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+      s.bind((HOST, PORT))
+      try:
+        s.listen()
+        
+        while True:
+          self.get_logger().info('Listening on %s:%d'%(HOST, PORT))
+          conn, addr = s.accept()
+          with conn:
+            self.get_logger().info('Connected to %s:%d'%(addr[0], addr[1]))
+            while True:
+              cmd = conn.recv(12) # read 12 bytes (float32 pan, float32 tilt, float32 zoom)
+              if cmd:
+                pan, tilt, zoom = struct.unpack('fff', cmd)
+                self.send_command(pan, tilt, zoom)
+      finally:
+        s.close()
 
 def main():
   rclpy.init()

@@ -7,7 +7,7 @@ package_name = 'onvif_camera'
 setup(
     name=package_name,
     version='0.1.0',
-    packages=[package_name, 'test_control'],
+    packages=[package_name, 'test_control', 'geometry_helper'],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),

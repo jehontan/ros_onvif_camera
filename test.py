@@ -1,31 +1,23 @@
-import random
-import time
-import math
+import socket
+import struct
 
-offset = {'pan': 22, 'tilt': 0}
+def main():
+  HOST = '192.168.137.216'
+  PORT = 2306
 
-def normal_to_radian(vec):
-  """
-  Converts from camera normalized form to radians.
-  """
-  return {
-    'x': (vec['x']+1.0)*180+offset['pan'],
-    'y': -(vec['y']-1.0)*45+offset['tilt']
-  }
+  with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    s.connect((HOST, PORT))
+    print('Connected!')
+    
+    while True:
+      txt = input('Pan, Tilt, Zoom >')
+      cmds = txt.split(',')
+      pan = float(cmds[0])
+      tilt = float(cmds[1])
+      zoom = float(cmds[2]) if len(cmds)>2 else 0.0
 
-def radian_to_normal(vec):
-  """
-  Converts from radians to camera normalized form.
-  """
-  return {
-    'x': 2*((vec['x']-offset['pan'])%360)/360 - 1.0,
-    'y':-2*((vec['y']-offset['tilt'])%90)/90 + 1.0
-  }
+      cmd = struct.pack('fff', pan, tilt, zoom)
+      s.send(cmd)
 
 if __name__ == '__main__':
-  while True:
-    v = {'x': random.uniform(0,360), 'y': random.uniform(0,90)}
-    n = radian_to_normal(v)
-    vv = normal_to_radian(n)
-    print(v, n, vv, all([math.isclose(v[k], vv[k]) for k in v.keys()]))
-    time.sleep(1)
+  main()

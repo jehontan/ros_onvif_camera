@@ -4,6 +4,7 @@ import rclpy
 from rclpy.node import Node
 from onvif import ONVIFCamera
 from onvif.exceptions import *
+from zeep.transports import Transport
 
 import numpy as np
 
@@ -21,7 +22,12 @@ class CameraNode(Node):
 
     # setup PTZ
     self.get_logger().info('Connecting to camera %s:%d'%(params['address'], params['port']))
-    self._camera = ONVIFCamera(params['address'], params['port'], params['user'], params['password'])
+    self._camera = ONVIFCamera(
+      host = params['address'], 
+      port = params['port'], 
+      user = params['user'], 
+      passwd = params['password'],
+      transport = Transport(operation_timeout=1)) # set 1 second timeout
     self.get_logger().info('Configuring services')
     self._media = self._camera.create_media_service()
     self._ptz = self._camera.create_ptz_service()
@@ -136,10 +142,16 @@ class CameraNode(Node):
       zoom - Zoom position from 0.0 to 1.0
     """
 
-    self.get_logger().info('Moving to: %f, %f, %f'%(
-      pan if pan is not None else self.pos['pan'],
-      tilt if tilt is not None else self.pos['tilt'],
-      zoom if zoom is not None else self.pos['zoom']))
+    # self.get_logger().info('Moving to: %f, %f, %f'%(
+    #   pan if pan is not None else self.pos['pan'],
+    #   tilt if tilt is not None else self.pos['tilt'],
+    #   zoom if zoom is not None else self.pos['zoom']))
+
+    self.get_logger().info(
+      'Moving to: %s'%(repr(self.radian_to_normal({
+          'x': pan if pan is not None else self.pos['pan'],
+          'y': tilt if tilt is not None else self.pos['tilt'],
+        }))))
 
     self._ptz.AbsoluteMove({
       'ProfileToken': self._profile_token,
@@ -170,8 +182,8 @@ class CameraNode(Node):
     Converts from radians to camera normalized form.
     """
     return {
-      'x': 2*((vec['x']-self.offset['pan'])%(2*np.pi))/(2*np.pi) - 1.0,
-      'y':-2*((vec['y']-self.offset['tilt'])%(np.pi/2))/(np.pi/2) + 1.0
+      'x': round(2*((vec['x']-self.offset['pan'])%(2*np.pi))/(2*np.pi) - 1.0, 4),
+      'y': round(-2*((vec['y']-self.offset['tilt'])%(np.pi/2))/(np.pi/2) + 1.0, 4)
     }
 
 def main():

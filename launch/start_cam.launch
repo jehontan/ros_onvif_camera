@@ -1,0 +1,13 @@
+<launch>
+  <arg name="address" default="192.168.0.100" />
+  <arg name="port" default="80" />
+
+  <node 
+    pkg="onvif_camera" exec="onvif_camera" output="screen" name="onvif_camera"
+    args="-p $(var port) -u $(var user) -a $(var password) $(var address)"
+  >
+    <remap from="/onvif_camera/cmd_abs_move" to="/cmd_abs_move"/>
+  </node>
+
+  <node pkg="onvif_camera" exec="test_control" output="screen"/>
+</launch>

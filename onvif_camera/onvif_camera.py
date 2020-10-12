@@ -92,7 +92,7 @@ class CameraNode(Node):
     # create control subscriber
     self._subscriber = self.create_subscription(
       PoseStamped,
-      'cmd_abs_move',
+      '/cmd_abs_move',
       self.handle_cmd_abs_move,
       10
     )

@@ -9,7 +9,7 @@ from zeep.transports import Transport
 import numpy as np
 
 import tf2_ros
-from geometry_msgs.msg import TransformStamped, PoseStamped
+from geometry_msgs.msg import TransformStamped, PoseStamped, Vector3Stamped
 
 from geometry_helper.geometry_helper import *
 
@@ -90,10 +90,17 @@ class CameraNode(Node):
     self._timer = self.create_timer(0.5, self.update_pose) # update every 0.5 sec
 
     # create control subscriber
-    self._subscriber = self.create_subscription(
+    self._cmd_abs_subscriber = self.create_subscription(
       PoseStamped,
       'cmd_abs_move',
       self.handle_cmd_abs_move,
+      10
+    )
+
+    self._cmd_continuous_subscriber = self.create_subscription(
+      Vector3Stamped,
+      'cmd_continuous_move',
+      self.handle_cmd_continuous_move,
       10
     )
 
@@ -164,9 +171,24 @@ class CameraNode(Node):
       }
     })
 
-  def continuous_move(self, pan_speed, tilt_speed, zoom_speed):
-    # TODO
-    raise NotImplementedError
+  def handle_cmd_continuous_move(self, msg):
+    self.continuous_move(msg.vector.x, msg.vector.y, msg.vector.z)
+
+  def continuous_move(self, pan_speed=0.0, tilt_speed=0.0, zoom_speed=0.0):
+    """
+    Move camera by specifying speed.
+    """
+
+    self._ptz.AbsoluteMove({
+      'ProfileToken': self._profile_token,
+      'Velocity': {
+        'PanTilt': self.radian_to_normal({
+          'x': pan_speed,
+          'y': tilt_speed,
+        }),
+        'Zoom': {'x': zoom_speed}
+      }
+    })
 
   def normal_to_radian(self, vec):
     """
